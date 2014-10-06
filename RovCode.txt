@@ -1,0 +1,207 @@
+
+
+// Y axis
+//There is only one motor controller in and down motions
+enum vert { 
+  climb = B100000,
+  dive = B010000,
+  neutralVert = B000000
+};
+//binary values were set to be used to match correct signals
+//and to be able to match more than a single signal at
+//any given time
+
+//X,Z axis (X is climb & dive; Z is right & left)
+enum hor { 
+  right = B001001,
+  left = B000110,
+  forward = B000101,
+  reverse = B001010,
+  neutralHor = B001111
+ };
+  //pin outs for sending signals to the speed controllers
+  int rightController = 9; //Plug into pin 10 **Actually left
+  int leftController = 10; //Plug into pin 9 **Actually right
+                           //DO NOT RE-PIN, THEY WORK, ITS JUST CONFUSING
+  int upDownController = 11;
+  
+  //pin ins for reading signal from control unit
+  int swFwd = 6;
+  int swRev = 5;
+  int swLeft = 3;
+  int swRight = 4;
+  int swClimb = 2;
+  int swDive = 7;
+  
+  //set standard char value for movement on each axis, initialized to neutral
+  char y = neutralVert;
+  char x = neutralHor;
+  char z = neutralHor;
+  char c;
+  
+void setup(){
+  
+  Serial.begin(9600);
+  pinMode(rightController, OUTPUT);
+  pinMode(leftController, OUTPUT);
+  pinMode(upDownController, OUTPUT);
+  
+  pinMode(swFwd, INPUT);
+  pinMode(swRev, INPUT);
+  pinMode(swLeft, INPUT);
+  pinMode(swRight, INPUT);
+  pinMode(swClimb, INPUT);
+  pinMode(swDive, INPUT);
+ 
+ 
+   
+}
+void loop(){
+  
+  
+  //reading digital inputs from control unit
+  float swFwdRead = digitalRead(swFwd);
+  float swRevRead = digitalRead(swRev);
+  float swRightRead = digitalRead(swRight);
+  float swLeftRead = digitalRead(swLeft);
+  float swClimbRead = digitalRead(swClimb);
+  float swDiveRead = digitalRead(swDive);
+  
+  
+  if(swClimbRead)
+  {
+   y = climb;
+    Serial.println("Climb");
+   
+   //Unfortunately it requires both too much time and unnecessary programming to format and put a string
+   //for each control value, these explicitely written characters are easy to send
+   //Another thing, when attempting to print a String Variable to the Oled it constantly
+   //gives an error saying that it cannot print a variable; either "char^" or "String^"
+   
+  }
+  else if(swDiveRead)
+  {
+   y = dive;
+   Serial.println("Dive");
+  }
+  else
+  {
+   y = neutralVert;
+   
+  }
+  
+  if(swFwdRead)
+  {
+   x = forward;
+   Serial.println("Forward");
+  }
+  else if(swRevRead)
+  {
+   x = reverse;
+   Serial.println("Reverse");
+  }
+  else
+  {
+  x = neutralHor;
+  
+  }
+
+  if(swRightRead)
+  {
+   z = right;
+   Serial.println("Right");
+  }
+  else if(swLeftRead)
+  {
+   z = left;
+   Serial.println("Left");
+  }
+  else
+  {
+  z = neutralHor;
+  
+  }
+
+  //Remember X is forward & reverse and Z is left & right. (Unfortunately written in confusing manor, but this is how it began and makes sense in terms of the robot)
+  //bit wise AND matches foreward and reverse AND left and right movement, checking to see if (later in the code) expected values are met for both z and x movement
+  c= x&z;
+  
+  
+  //conditional checking for horizontal neutrality
+  (c==B001111)?c=B000000:c=c;
+  
+  //The OR operator allows for climb and dive motion as well as the previous "c" value which could consist of the combinations of Forward, Reverse and Left, Right movement
+  //the previous "c" could also be a neutral signal, meaning only the climb or dive motion signal is recieved
+  c= c|y;
+  
+  /*
+  this part is tricky
+  
+  The way that the speed controllers work is very demanding (they are very old in comparison with controllers today)
+  They require a manually built PWM signal using digital HIGH || LOW outputs withing some given timing
+  This had to be done by manual calibration and lots of testing
+  
+  So the premise of how they work in that a motor will set to go forward if the speed controller recieves signal of 2 millisecond delay
+  They will go in reverse for 1 milliseconds of delay
+  and finally they will stay neutral for any signal with delay of 3 or more milliseconds
+  
+  ------------------------------------------------------------------------------------------------------------------------------------------------------
+  so above, comparisons were made between the movement in x,y, and z axis, or nuetral leaving 36 combinations possible
+  this mathicng process will determine which combination the signal recieve is comprised of, if they are not neutral, then the motors will do something
+  an example is if the client pressed forward and right and climb: 
+  
+  B000101
+  B001001 &
+  =======
+  B000001
+  
+  also
+  
+  B000001
+  B100000 ||
+  =======
+  B100001
+  
+  then within the if statements:
+  
+  B100001 & B001100 --> B000000 !=B000000 == false --> rightController ---
+  B100001 & B000011 --> B000001 !=B000000 == true --> leftController HIGH
+  B100001 & B110000 --> B100000 !=B000000 == true --> upDownController HIGH (there is only one motor controlling up and down motions)
+  
+  B100001 & B000100 --> B000000 !=B000000 == false --> rightController ---
+  B100001 & B000001 --> B000001 !=B000000 == true --> leftController LOW
+  B100001 & B010000 --> B000000 !=B000000 == false --> upDownController (stays) HIGH
+  
+  B100001 & B000100 --> B000000 !=B000000 == false --> rightController LOW (doesn't matter)
+  B100001 & B000001 --> B000001 !=B000000 == true --> leftController HIGH
+  B100001 & B010000 --> B000000 !=B000000 == false --> upDownController LOW
+   
+  B100001 & B000100 --> B000000 !=B000000 == false -->  rightController ---
+  B100001 & B000001 --> B000001 !=B000000 == true --> leftController LOW
+  B100001 & B010000 --> B000000 !=B000000 == false --> upDownController (stays) LOW
+  
+  Overall:
+  Right controller (somewhat of a 3 milliseconds delay if counting the LOW signal) == NEUTRAL
+  Left controller (1 second delay) == REVERSE
+  Up/Down controller (2 second delay) == FORWARD (up) [yes it seems that it should be in reverse to make the robot climb, but, unfortunately again, things are very confusing the motor is mounted the wrong way]
+  ------------------------------------------------------------------------------------------------------------------------------------------------------
+  
+  */
+  if((c&B001100) != B000000){digitalWrite(rightController, HIGH);}
+  if((c&B000011) != B000000){digitalWrite(leftController, HIGH);}
+  if((c&B110000) != B000000){digitalWrite(upDownController, HIGH);}
+  delay(1);
+  if((c&B000100) != B000000)digitalWrite(rightController, LOW);
+  if((c&B000001) != B000000)digitalWrite(leftController, LOW);
+  if((c&B010000) != B000000)digitalWrite(upDownController, LOW);
+  delay(1);
+  ((c&B000100) != B000000)?digitalWrite(rightController, HIGH):digitalWrite(rightController, LOW);
+  ((c&B000001) != B000000)?digitalWrite(leftController, HIGH):digitalWrite(leftController, LOW);
+  ((c&B010000) != B000000)?digitalWrite(upDownController, HIGH):digitalWrite(upDownController, LOW);
+  delay(1);
+  if((c&B000100) != B000000)digitalWrite(rightController, LOW);
+  if((c&B000001) != B000000)digitalWrite(leftController, LOW);
+  if((c&B010000) != B000000)digitalWrite(upDownController, LOW);
+  delay(1);
+  
+}
