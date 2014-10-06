@@ -134,7 +134,7 @@ void loop(){
   //the previous "c" could also be a neutral signal, meaning only the climb or dive motion signal is recieved
   c= c|y;
   
-  /*
+  /* ------------------------- Explanation of Control
   this part is tricky
   
   The way that the speed controllers work is very demanding (they are very old in comparison with controllers today)
@@ -186,7 +186,9 @@ void loop(){
   Up/Down controller (2 second delay) == FORWARD (up) [yes it seems that it should be in reverse to make the robot climb, but, unfortunately again, things are very confusing the motor is mounted the wrong way]
   ------------------------------------------------------------------------------------------------------------------------------------------------------
   
-  */
+  */ -------------------- End of Explanation of Control
+  
+  
   if((c&B001100) != B000000){digitalWrite(rightController, HIGH);}
   if((c&B000011) != B000000){digitalWrite(leftController, HIGH);}
   if((c&B110000) != B000000){digitalWrite(upDownController, HIGH);}
