@@ -186,7 +186,7 @@ void loop(){
   Up/Down controller (2 second delay) == FORWARD (up) [yes it seems that it should be in reverse to make the robot climb, but, unfortunately again, things are very confusing the motor is mounted the wrong way]
   ------------------------------------------------------------------------------------------------------------------------------------------------------
   
-  */ -------------------- End of Explanation of Control
+  */ //-------------------- End of Explanation of Control
   
   
   if((c&B001100) != B000000){digitalWrite(rightController, HIGH);}
